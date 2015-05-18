@@ -281,6 +281,7 @@ export default Ember.Service.extend(Ember.Evented, {
       }
       this.set('_iteratorStep', 0);
       this.trigger('complete');
+      this.notifyPropertyChange('_tourObject');
     });
     tour.on('cancel', () => {
       this._cleanupModalLeftovers();
@@ -289,6 +290,7 @@ export default Ember.Service.extend(Ember.Evented, {
       }
       this.set('_iteratorStep', 0);
       this.set('isActive', false);
+      this.notifyPropertyChange('_tourObject');
     });
 
     // Return the created tour object
