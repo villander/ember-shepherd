@@ -1,5 +1,206 @@
 import Ember from 'ember';
 
+////////////////////////////////////////////////////////////////////////////////
+//                             Utility Functions                              //
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Checks the builtInButtons array for the step and adds a button with the correct action for the type
+ * @param step The step to add the buttons to
+ * @param shepherdStepOptions The options array to modify
+ */
+function addBuiltInButtons(step, shepherdStepOptions) {
+  step.options.builtInButtons.forEach((button) => {
+    if (button.type === 'next') {
+      shepherdStepOptions.buttons.push({
+        classes: button.classes,
+        text: button.text,
+        action: () => {
+          this.trigger('next');
+        }
+      });
+    } else if (button.type === 'back') {
+      shepherdStepOptions.buttons.push({
+        classes: button.classes,
+        text: button.text,
+        action: () => {
+          this.trigger('back');
+        }
+      });
+    } else if (button.type === 'cancel') {
+      shepherdStepOptions.buttons.push({
+        classes: button.classes,
+        text: button.text,
+        action: () => {
+          this.trigger('cancel');
+        }
+      });
+    }
+  });
+}
+
+/**
+ * Get the element from an option string
+ *
+ * @method getElementFromString
+ * @param string element the string in the step configuration
+ * @returns {Element} the element from the string
+ */
+function getElementFromString(element) {
+  var attachTo = element.split(' ');
+  attachTo.pop();
+  var selector = attachTo.join(' ');
+  return Ember.$(selector).get(0);
+}
+
+/**
+ * Get the element from an option object
+ *
+ * @method getElementFromObject
+ * @param Object attachTo
+ * @returns {Element}
+ */
+function getElementFromObject(attachTo) {
+  const op = attachTo.element;
+  return Ember.$(op).get(0);
+}
+
+/**
+ * Return the element for a step
+ *
+ * @method getElementForStep
+ * @param step step the step to get an element for
+ * @returns {Element} the element for this step
+ */
+function getElementForStep(step) {
+  const attachTo = step.options.attachTo;
+  const type = typeof attachTo;
+  var element;
+  switch (type) {
+    case "string":
+      element = getElementFromString(attachTo);
+      break;
+    default:
+      element = getElementFromObject(attachTo);
+      break;
+  }
+  return element;
+}
+
+/**
+ * Taken from introjs https://github.com/usablica/intro.js/blob/master/intro.js#L1092-1124
+ * Get an element position on the page
+ * Thanks to `meouw`: http://stackoverflow.com/a/442474/375966
+ *
+ * @api private
+ * @method getOffset
+ * @param {Object} element
+ * @returns {*} Element's position info
+ */
+function getElementPosition(element) {
+  var elementPosition = {};
+
+  //set width
+  elementPosition.width = element.offsetWidth;
+
+  //set height
+  elementPosition.height = element.offsetHeight;
+
+  //calculate element top and left
+  var _x = 0;
+  var _y = 0;
+  while (element && !isNaN(element.offsetLeft) && !isNaN(element.offsetTop)) {
+    _x += element.offsetLeft;
+    _y += element.offsetTop;
+    element = element.offsetParent;
+  }
+  //set top
+  elementPosition.top = _y;
+  //set left
+  elementPosition.left = _x;
+
+  return elementPosition;
+}
+
+/**
+ * Creates an overlay element clone of the element you want to highlight and copies all the styles.
+ * @param step The step object that points to the element to highlight
+ */
+function createHighlightOverlay(step) {
+  Ember.$('#highlightOverlay').remove();
+  var currentElement = getElementForStep(step);
+  var elementPosition = getElementPosition(currentElement);
+  var highlightElement = Ember.$(currentElement).clone();
+  highlightElement.attr('id', 'highlightOverlay');
+  Ember.$('body').append(highlightElement);
+  var computedStyle = window.getComputedStyle(currentElement).cssText;
+  highlightElement[0].style.cssText = computedStyle;
+  //Style all internal elements as well
+  var children = Ember.$(currentElement).children();
+  var clonedChildren = highlightElement.children();
+  for (var i = 0; i < children.length; i++) {
+    clonedChildren[i].style.cssText = window.getComputedStyle(children[i]).cssText;
+  }
+  highlightElement.css('position', 'absolute');
+  highlightElement.css('left', elementPosition.left);
+  highlightElement.css('top', elementPosition.top);
+  highlightElement.css('width', elementPosition.width);
+  highlightElement.css('height', elementPosition.height);
+  highlightElement.css('z-index', '10002');
+}
+
+/**
+ * Increases the z-index of the element, to pop it out above the overlay and highlight it
+ * @param step The step object that attaches to the element
+ */
+function popoutElement(step) {
+  Ember.$('.shepherd-modal').removeClass('shepherd-modal');
+  var currentElement = getElementForStep(step);
+  Ember.$(currentElement).addClass('shepherd-modal');
+  if (step.options.highlightClass) {
+    Ember.$(currentElement).addClass(step.options.highlightClass);
+  }
+}
+
+/**
+ * Exchanges the given attachment configuration for the object equivalent with
+ * the DOM element passed in directly.
+ *
+ * Allows for use of pseudoselectors, because it uses jQuery's selector engine
+ * instead of the built-in one
+ *
+ * @param {Object} attachTo The given "attachTo" configuration
+ * @return {Object} The optimized configuration
+ */
+function exchangeForAttachmentConfig(attachTo) {
+  const type = typeof attachTo;
+  var config = {
+    element: null,
+    on: null
+  };
+  switch(type) {
+    case "string": {
+      config.element = getElementFromString(attachTo);
+      const configArray = attachTo.split(' ');
+      config.on = configArray[configArray.length - 1];
+      break;
+    }
+    case "object": {
+      config.element = getElementFromObject(attachTo);
+      config.on = attachTo.on;
+      break;
+    }
+    default:
+      config = null;
+  }
+  return config;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                              Tour Service                                  //
+////////////////////////////////////////////////////////////////////////////////
+
 export default Ember.Service.extend(Ember.Evented, {
 
   // Get current path
@@ -178,150 +379,6 @@ export default Ember.Service.extend(Ember.Evented, {
   },
 
   /**
-   * Checks the builtInButtons array for the step and adds a button with the correct action for the type
-   * @param step The step to add the buttons to
-   * @param shepherdStepOptions The options array to modify
-   */
-  _addBuiltInButtons: function(step, shepherdStepOptions) {
-    step.options.builtInButtons.forEach((button) => {
-      if (button.type === 'next') {
-        shepherdStepOptions.buttons.push({
-          classes: button.classes,
-          text: button.text,
-          action: () => {
-            this.trigger('next');
-          }
-        });
-      } else if (button.type === 'back') {
-        shepherdStepOptions.buttons.push({
-          classes: button.classes,
-          text: button.text,
-          action: () => {
-            this.trigger('back');
-          }
-        });
-      } else if (button.type === 'cancel') {
-        shepherdStepOptions.buttons.push({
-          classes: button.classes,
-          text: button.text,
-          action: () => {
-            this.trigger('cancel');
-          }
-        });
-      }
-    });
-  },
-
-  /**
-   * Creates an overlay element clone of the element you want to highlight and copies all the styles.
-   * @param step The step object that points to the element to highlight
-   */
-  _createHighlightOverlay: function(step) {
-    Ember.$('#highlightOverlay').remove();
-    var currentElement = this._getElementForStep(step);
-    var elementPosition = this._getElementPosition(currentElement);
-    var highlightElement = Ember.$(currentElement).clone();
-    highlightElement.attr('id', 'highlightOverlay');
-    Ember.$('body').append(highlightElement);
-    var computedStyle = window.getComputedStyle(currentElement).cssText;
-    highlightElement[0].style.cssText = computedStyle;
-    //Style all internal elements as well
-    var children = Ember.$(currentElement).children();
-    var clonedChildren = highlightElement.children();
-    for (var i = 0; i < children.length; i++) {
-      clonedChildren[i].style.cssText = window.getComputedStyle(children[i]).cssText;
-    }
-    highlightElement.css('position', 'absolute');
-    highlightElement.css('left', elementPosition.left);
-    highlightElement.css('top', elementPosition.top);
-    highlightElement.css('width', elementPosition.width);
-    highlightElement.css('height', elementPosition.height);
-    highlightElement.css('z-index', '10002');
-  },
-
-  /**
-   * Exchanges the given attachment configuration for the object equivalent with
-   * the DOM element passed in directly.
-   *
-   * Allows for use of pseudoselectors, because it uses jQuery's selector engine
-   * instead of the built-in one
-   *
-   * @param {Object} attachTo The given "attachTo" configuration
-   * @return {Object} The optimized configuration
-   */
-  _exchangeForAttachmentConfig: function(attachTo) {
-    const type = typeof attachTo;
-    var config = {
-      element: null,
-      on: null
-    };
-    switch(type) {
-      case "string": {
-        config.element = this._getElementFromString(attachTo);
-        const configArray = attachTo.split(' ');
-        config.on = configArray[configArray.length - 1];
-        break;
-      }
-      case "object": {
-        config.element = this._getElementFromObject(attachTo);
-        config.on = attachTo.on;
-        break;
-      }
-      default:
-        config = null;
-    }
-    return config;
-  },
-
-  /**
-   * Return the element for a step
-   *
-   * @method _getElementForStep
-   * @param step step the step to get an element for
-   * @returns {Element} the element for this step
-   */
-  _getElementForStep: function(step) {
-    const attachTo = step.options.attachTo;
-    const type = typeof attachTo;
-    var element;
-    switch (type) {
-      case "string":
-        element = this._getElementFromString(attachTo);
-        break;
-      default:
-        element = this._getElementFromObject(attachTo);
-        break;
-    }
-    return element;
-  },
-
-  /**
-   * Get the element from an option string
-   *
-   * @method _getElementFromString
-   * @param string element the string in the step configuration
-   * @returns {Element} the element from the string
-   */
-  _getElementFromString: function(element) {
-    var attachTo = element.split(' ');
-    attachTo.pop();
-    var selector = attachTo.join(' ');
-    return Ember.$(selector).get(0);
-  },
-
-  /**
-   * Get the element from an option object
-   *
-   * @method _getElementFromObject
-   * @param Object attachTo
-   * @returns {Element}
-   */
-  _getElementFromObject: function(attachTo) {
-    const op = attachTo.element;
-    return Ember.$(op).get(0);
-  },
-
-  /**
    * Return the element for the current step
    *
    * @method _getElementForCurrentStep
@@ -329,55 +386,7 @@ export default Ember.Service.extend(Ember.Evented, {
    */
   _getElementForCurrentStep: function() {
     var currentStep = this.get('_tourObject').getCurrentStep();
-    return this._getElementForStep(currentStep);
-  },
-
-  /**
-   * Increases the z-index of the element, to pop it out above the overlay and highlight it
-   * @param step The step object that attaches to the element
-   */
-  _popoutElement: function(step) {
-    Ember.$('.shepherd-modal').removeClass('shepherd-modal');
-    var currentElement = this._getElementForStep(step);
-    Ember.$(currentElement).addClass('shepherd-modal');
-    if (step.options.highlightClass) {
-      Ember.$(currentElement).addClass(step.options.highlightClass);
-    }
-  },
-
-  /**
-   * Taken from introjs https://github.com/usablica/intro.js/blob/master/intro.js#L1092-1124
-   * Get an element position on the page
-   * Thanks to `meouw`: http://stackoverflow.com/a/442474/375966
-   *
-   * @api private
-   * @method _getOffset
-   * @param {Object} element
-   * @returns {*} Element's position info
-   */
-  _getElementPosition: function(element) {
-    var elementPosition = {};
-
-    //set width
-    elementPosition.width = element.offsetWidth;
-
-    //set height
-    elementPosition.height = element.offsetHeight;
-
-    //calculate element top and left
-    var _x = 0;
-    var _y = 0;
-    while (element && !isNaN(element.offsetLeft) && !isNaN(element.offsetTop)) {
-      _x += element.offsetLeft;
-      _y += element.offsetTop;
-      element = element.offsetParent;
-    }
-    //set top
-    elementPosition.top = _y;
-    //set left
-    elementPosition.left = _x;
-
-    return elementPosition;
+    return getElementForStep(currentStep);
   }
 
 });
