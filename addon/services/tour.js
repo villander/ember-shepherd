@@ -214,6 +214,16 @@ export default Ember.Service.extend(Ember.Evented, {
   requiredElements: Ember.A([]),
   steps: Ember.A([]),
 
+  // Iterate over steps
+  _iteratorStep: 0,
+  _nextStep: function() {
+    const index = this.get('_iteratorStep');
+    const step = this.get('steps').objectAt(index);
+    const toReturn = [step, index] || null;
+    this.set('_iteratorStep', index + 1);
+    return toReturn;
+  },
+
   // Handle errors
   errorTitle: null,
   messageForUser: null,
@@ -230,48 +240,13 @@ export default Ember.Service.extend(Ember.Evented, {
       return;
     }
 
-    // Create a new tour object with the new defaults
+    // Create a new tour object with defaults
     var tour = new Shepherd.Tour({
       defaults: this.get('defaults')
     });
 
     // Check for the required elements and set up the steps on the tour
-    if (this._requiredElementsPresent()) {
-      steps.forEach((step, index) => {
-        var shepherdStepOptions = {buttons: []};
-        for (var option in step.options) {
-          if (option === 'builtInButtons') {
-            this._addBuiltInButtons(step, shepherdStepOptions);
-          } else if (option === 'attachTo') {
-            shepherdStepOptions[option] = this._exchangeForAttachmentConfig(step.options[option]);
-          } else {
-            shepherdStepOptions[option] = step.options[option];
-          }
-        }
-        tour.addStep(step.id, shepherdStepOptions);
-
-        // Step up events for the current step
-        var currentStep = tour.steps[index];
-        currentStep.on('before-show', () => {
-          if (this.get('modal')) {
-            this._getElementForStep(currentStep).style.pointerEvents = 'none';
-            if (currentStep.options.copyStyles) {
-              this._createHighlightOverlay(currentStep);
-            } else {
-              this._popoutElement(currentStep);
-            }
-          }
-        });
-        currentStep.on('hide', () => {
-          //Remove element copy, if it was cloned
-          var currentElement = this._getElementForStep(currentStep);
-          if (currentStep.options.highlightClass) {
-            Ember.$(currentElement).removeClass(currentStep.options.highlightClass);
-          }
-          Ember.$('#highlightOverlay').remove();
-        });
-      });
-    } else {
+    if (!this._requiredElementsPresent()) {
       tour.addStep('error', {
         buttons: [{
           text: 'Exit',
@@ -292,12 +267,19 @@ export default Ember.Service.extend(Ember.Evented, {
       if (this.get('disableScroll')) {
         Ember.$(window).disablescroll();
       }
+      const [step, index] = this._nextStep();
+      if (tour.addStep && Ember.isPresent(step) && this._requiredElementsPresent()) {
+        this._addStepToTour(tour, step, index);
+        getElementForStep(step).style.pointerEvents = 'auto';
+      }
+      this.set('isActive', true);
     });
     tour.on('complete', () => {
       this._cleanupModalLeftovers();
       if (this.get('disableScroll')) {
         Ember.$(window).disablescroll('undo');
       }
+      this.set('_iteratorStep', 0);
       this.trigger('complete');
     });
     tour.on('cancel', () => {
@@ -305,51 +287,93 @@ export default Ember.Service.extend(Ember.Evented, {
       if (this.get('disableScroll')) {
         Ember.$(window).disablescroll('undo');
       }
+      this.set('_iteratorStep', 0);
+      this.set('isActive', false);
     });
 
     // Return the created tour object
     return tour;
   }.property('steps', 'default', 'requiredElements'),
 
+  /**
+   * Set up events
+   */
   init: function() {
     // Set up event bindings
     this.on('start', () => {
-      // What else has to be run on start?
       Ember.run.scheduleOnce('afterRender', this, function() {
-        if (Ember.isPresent(this.get('_tourObject'))) {
-          this.get('_tourObject').start();
-        }
-        this.set('isActive', true);
+        this.get('_tourObject').start();
       });
     });
-    this.on('complete', () => {
-      // What else has to be run on completion?
-      this.set('isActive', false);
-    });
     this.on('cancel', () => {
-      this._cleanupModalLeftovers();
       this.get('_tourObject').cancel();
-      this.set('isActive', false);
     });
     this.on('next', () => {
-      //Re-enable clicking on the element
-      this._getElementForCurrentStep().style.pointerEvents = 'auto';
-      this.get('_tourObject').next();
+      // Add the step to the tour and transition to it
+      const tour = this.get('_tourObject');
+      const [step, index] = this._nextStep();
+      if (Ember.isPresent(step) && this._requiredElementsPresent()) {
+        this._addStepToTour(tour, step, index);
+        getElementForStep(step).style.pointerEvents = 'auto';
+        tour.next();
+      } else {
+        this.trigger('cancel');
+      }
     });
     this.on('back', () => {
       //Re-enable clicking on the element
       this._getElementForCurrentStep().style.pointerEvents = 'auto';
-      this.get('_tourObject').back();
+      const stepIndex = this.get('_iteratorStep');
+      this.set('_iteratorStep', stepIndex - 2);
+      this.trigger('next');
+    });
+  },
+
+  /**
+   * Adds a step to the tour object
+   */
+  _addStepToTour: function(tour, step, index) {
+    var shepherdStepOptions = {buttons: []};
+    for (var option in step.options) {
+      if (option === 'builtInButtons') {
+        addBuiltInButtons.call(this, step, shepherdStepOptions);
+      } else if (option === 'attachTo') {
+        shepherdStepOptions[option] = exchangeForAttachmentConfig(step.options[option]);
+      } else {
+        shepherdStepOptions[option] = step.options[option];
+      }
+    }
+    tour.addStep(step.id, shepherdStepOptions);
+
+    // Step up events for the current step
+    var currentStep = tour.steps[index];
+    currentStep.on('before-show', () => {
+      if (this.get('modal')) {
+        getElementForStep(currentStep).style.pointerEvents = 'none';
+        if (currentStep.options.copyStyles) {
+          createHighlightOverlay(currentStep);
+        } else {
+          popoutElement(currentStep);
+        }
+      }
+    });
+    currentStep.on('hide', () => {
+      //Remove element copy, if it was cloned
+      var currentElement = getElementForStep(currentStep);
+      if (currentStep.options.highlightClass) {
+        Ember.$(currentElement).removeClass(currentStep.options.highlightClass);
+      }
+      Ember.$('#highlightOverlay').remove();
     });
   },
 
   _cleanupModalLeftovers: function() {
     if (this.get('modal')) {
-      if (this.get('tour') &&
-        this.get('tour').getCurrentStep() &&
-        this.get('tour').getCurrentStep().options.attachTo &&
-        this._getElementForStep(this.get('tour').getCurrentStep())) {
-        this._getElementForStep(this.get('tour').getCurrentStep()).style.pointerEvents = 'auto';
+      if (this.get('_tourObject') &&
+        this.get('_tourObject').getCurrentStep() &&
+        this.get('_tourObject').getCurrentStep().options.attachTo &&
+        this._getElementForCurrentStep()) {
+        this._getElementForCurrentStep().style.pointerEvents = 'auto';
       }
       Ember.run('afterRender', function() {
         Ember.$('#shepherdOverlay').remove();
