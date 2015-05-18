@@ -205,7 +205,11 @@ export default Ember.Service.extend(Ember.Evented, {
 
   // Get current path
   _applicationController: null,
-  currentPath: Ember.computed.oneWay('_applicationController.currentPath'),
+  _currentPath: Ember.computed.oneWay('_applicationController.currentPath'),
+
+  cancelOnTransition: function() {
+    this.get('_tourObject').cancel();
+  }.observes('_currentPath'),
 
   // Configuration Options
   defaults: {},
