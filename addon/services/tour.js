@@ -203,16 +203,6 @@ function exchangeForAttachmentConfig(attachTo) {
 
 export default Ember.Service.extend(Ember.Evented, {
 
-  // Get current path
-  _applicationController: null,
-  _currentPath: Ember.computed.oneWay('_applicationController.currentPath'),
-
-  cancelOnTransition: function() {
-    if (this.get('isActive')) {
-      this.get('_tourObject').cancel();
-    }
-  }.observes('_currentPath'),
-
   // Configuration Options
   defaults: {},
   disableScroll: false,
