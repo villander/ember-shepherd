@@ -293,7 +293,7 @@ export default Service.extend(Evented, {
   /**
    * Create a tour object based on the current configuration
    */
-  stepsChange: observer('steps', function () {
+  stepsChange: observer('steps', 'isActive', function () {
     this.initialize();
     const steps = this.get('steps');
     const tour = this.get('tourObject');

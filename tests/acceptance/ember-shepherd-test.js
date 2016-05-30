@@ -307,3 +307,47 @@ test("`pointer-events` is set to `auto` for any step element on clean up", funct
     });
   });
 });
+
+test("removing a required element after page load but before start should disable the tour", function(assert) {
+  assert.expect(4);
+  container.lookup('route:application').set('autoStart', false);
+
+  visit('/');
+
+  // Remove a required DOM element
+  var elem = find('.next-button', '[data-id="intro"]');
+
+  console.log(elem);
+
+  // try to start the tutorial
+
+
+  // Check the error popover displays instead
+
+  click(':contains(Modal Demo)');
+
+
+  // Go through a step of the tour...
+  andThen(() => {
+    patchClick('.next-button', '[data-id="intro"]');
+  });
+
+  // Check the target elements have pointer-events = 'none'
+  andThen(() => {
+    // Get the 2 shepherd-target's
+    find('.shepherd-target').map((key, elem) => {
+      assert.equal(elem.style.pointerEvents, 'none');
+    });
+
+    // Exit the tour
+    patchClick('.cancel-button', '[data-id="installation"]');
+  });
+
+  // Check all the target elements now have pointer-events = 'auto'
+  andThen(() => {
+    // Get the 2 shepherd-target's again
+    find('.shepherd-target').map((key, elem) => {
+      assert.equal(elem.style.pointerEvents, 'auto');
+    });
+  });
+});
