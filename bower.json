@@ -1,7 +1,7 @@
 {
   "name": "ember-shepherd",
   "description": "An Ember wrapper for the site tour library Shepherd.",
-  "homepage": "http://rwwagner90.github.io/ember-shepherd/",
+  "homepage": "http://shipshapecode.github.io/ember-shepherd/",
   "authors": [
     {
       "name": "Robert Wagner",
@@ -25,23 +25,23 @@
     }
   ],
   "dependencies": {
-    "ember": "2.3.0",
-    "ember-cli-shims": "0.1.0",
+    "ember": "~2.6.0-beta.2",
+    "ember-cli-shims": "0.1.1",
     "ember-cli-test-loader": "0.2.2",
-    "ember-load-initializers": "0.1.7",
-    "ember-qunit-notifications": "0.1.0",
     "foundation": "~5.5.0",
-    "jquery": "2.1.3",
-    "loader.js": "^3.5.0",
     "prism": "gh-pages",
     "tether-shepherd": "~1.5.0"
   },
   "devDependencies": {
-    "jquery-disablescroll": "ultrapasty/jquery-disablescroll"
+    "jquery-disablescroll": "ultrapasty/jquery-disablescroll",
+    "blanket": "5e94fc30f2e694bb5c3718ddcbf60d467f4b4d26"
   },
   "keywords": [
     "tour",
     "shepherd",
     "tether"
-  ]
+  ],
+  "resolutions": {
+    "ember-qunit-notifications": "0.1.0"
+  }
 }
