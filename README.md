@@ -49,19 +49,10 @@ From here, you can set the desired configuration, as detailed below.
 
 The following configuration options can be `set` on the Tour service to control the way that Shepherd is used.  The only required option is `steps`, which you can read more about below.
 
-### autoStart
-
-`autoStart` is a boolean flag you can set to `true` or `false` to go ahead and automatically 
-start the tour after you have added steps to the tour.
-
-> **default value:** `false`
-
 ### defaults
 
-`defaults` is used to set the options that will be applied to each step by default. 
-You can pass in any of the options that you can with Shepherd. 
-
-## You must set defaults *BEFORE* setting steps
+`defaults` is used to set the options that will be applied to each step by default.
+You can pass in any of the options that you can with Shepherd.
 
 It will be an object of a form something like:
 
